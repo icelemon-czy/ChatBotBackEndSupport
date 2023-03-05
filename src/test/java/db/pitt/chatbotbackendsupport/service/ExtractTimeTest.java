@@ -6,14 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.json.*;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStreamWriter;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.Scanner;
 
 
 @Slf4j
@@ -41,7 +33,8 @@ public class ExtractTimeTest {
             "It's two o'clock",
             " 2 :00",
             " 2: 00",
-            "2 : 00"
+            "2 : 00",
+            "12",
     };
 
     @Test
@@ -50,6 +43,7 @@ public class ExtractTimeTest {
             System.out.println(extractTime.RE(input));
         }
     }
+
     String[] Success_inputs = new String[]{
             "twelve am",
             "twelve pm",
@@ -63,7 +57,8 @@ public class ExtractTimeTest {
             "midday",
             "noon",
             "midnight",
-            "2pm"
+            "2pm",
+            "13 43"
     };
     @Test
     public void SuccessTest(){

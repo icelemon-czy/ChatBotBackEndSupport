@@ -24,7 +24,18 @@ public class Controller {
 
     @GetMapping("/re/{input}")
     public Response RE(@PathVariable("input") String input) {
-        return extractTimeService.RE(input);
+        log.info("Regular expression input: " +input);
+        Response response = extractTimeService.RE(input);
+        if(response.code == 0){
+            log.info("RE Success " + response.time.hour+" "+response.time.minute);
+        } else if (response.code == 1) {
+            log.info("RE Ambiguity");
+        } else if (response.code == 2) {
+            log.info("RE Conflict");
+        }else{
+            log.info("RE Fail");
+        }
+        return response;
     }
 
 
@@ -33,12 +44,28 @@ public class Controller {
                                        @PathVariable("departureMin") int departureMin,
                                        @PathVariable("arrivalHour") int arrivalHour,
                                        @PathVariable("arrivalMin") int arrivalMin){
-        return extractTimeService.DepartureAmbiguity(departureHour, departureMin, arrivalHour, arrivalMin);
+        log.info("Resolve Departure Ambiguity "+"Arrival Time "+arrivalHour+":" +arrivalMin+
+                " Departure Time(Ambiguity) "+departureHour+":"+departureMin);
+        Response response = extractTimeService.DepartureAmbiguity(departureHour, departureMin, arrivalHour, arrivalMin);
+        if(response.code == 7){
+            log.info("DA Ambiguity Resolved ");
+        }else {
+            log.info("DA Ambiguity doesn't Resolved ");
+        }
+        return response;
     }
 
     @GetMapping("/yesmodel/{input}")
     public String YesOrNo(@PathVariable("input") String input) {
-        return yesOrNoModel.RequestYesOrNo(input);
+        log.info("YesOrNoModel input: "+input);
+        String intention = yesOrNoModel.RequestYesOrNo(input);
+        log.info("Detect intention: "+intention);
+        return intention;
+    }
+
+    @GetMapping("/matchexpectation/{input}")
+    public void SaveExpectation(@PathVariable("input") String input){
+        log.info("User expectation: "+ input);
     }
 
 

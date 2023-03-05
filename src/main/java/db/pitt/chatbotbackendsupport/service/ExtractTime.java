@@ -62,7 +62,6 @@ public class ExtractTime {
         }
     }
     /**
-     * TODO: Edge Case : 2pm , 12
      * TODO :Ambiguity , 20-5 - only for Hyphenated word
      */
     public Response RE(String input) {
@@ -315,6 +314,23 @@ public class ExtractTime {
         }
         Response response = new Response();
         response.code = 5;
+        if(!indexInteger.isEmpty()) {
+            // TODO Ambiguity: Does  11 can count as 11 o'clock ?
+            for(int number : indexInteger.values()){
+                if(isValidHour(number)){
+                    if(is12HourSystem(number)){
+                        // Ambiguity am or pm
+                        response.code = 1;
+                        response.time = new Time(number,0);
+                    }else{
+                        // No Ambiguity
+                        response.code = 0;
+                        response.time = new Time(number,0);
+                        return  response;
+                    }
+                }
+            }
+        }
         return response;
     }
 
@@ -377,7 +393,8 @@ public class ExtractTime {
                 }
                 return response;
             }
-        }else{
+        }
+        else{
             Integer time = extractInt(word);
             if(time!= null && time>= 100){
                 int minute= time%100;
