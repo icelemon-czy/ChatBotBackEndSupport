@@ -7,7 +7,7 @@ public class Constant {
     public static final HashMap<String,Integer> linkWordToInt = new HashMap<>();
 
     static{
-        wordToInt.put("o",0);
+        //    wordToInt.put("o",0);
         wordToInt.put("zero", 0);
         wordToInt.put("one", 1);
         wordToInt.put("two", 2);
@@ -32,8 +32,6 @@ public class Constant {
         wordToInt.put("thirty",30);
         wordToInt.put("forty",40);
         wordToInt.put("fifty",50);
-        wordToInt.put("quarter",15);
-        wordToInt.put("half",30);
 
         linkWordToInt.put("zero", 0);
         linkWordToInt.put("o",0);

@@ -1,5 +1,4 @@
 package db.pitt.chatbotbackendsupport.entity;
-
 /**
  * Response Code :
  * 0  - Success
@@ -10,10 +9,6 @@ package db.pitt.chatbotbackendsupport.entity;
  * Based on the Arrival Time , Resolve the Departure Time Ambiguity We choose the closest departure time
  * 7  - ResolveAmbiguity  Example arrival 1 pm  arrival 11 clock -> Return 11 am
  * 8  - CannotResolveAmbiguity Example arrival 10 am  arrival 11 clock -> Either 11 am or 11 pm is not appropriate
- *
- * Try to extract pattern HH:MM from a word(String)
- * 10 - extractHHMM Success
- * 11 - extractHHMM Fail
  */
 public class Response{
     public int code;
@@ -22,13 +17,13 @@ public class Response{
     @Override
     public String toString() {
         if(code == 0){
-            return "Success " + time.hour+"-"+time.minute;
+            return "Success: " + time;
         }
         if(code == 1){
-            return "Ambiguity "+ time.hour+"-"+time.minute;
+            return "Ambiguity: "+ time;
         }
         if(code == 2){
-            return "Conflict "+ time.hour+"-"+time.minute;
+            return "Conflict";
         }
         if(code == 5){
             return "Can't extract time";

@@ -2,11 +2,12 @@ package db.pitt.chatbotbackendsupport.service;
 
 import db.pitt.chatbotbackendsupport.entity.Response;
 import db.pitt.chatbotbackendsupport.entity.Time;
+import db.pitt.chatbotbackendsupport.util.Util;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.PathVariable;
 
-import java.util.HashMap;
+import java.util.*;
 
 import static db.pitt.chatbotbackendsupport.constant.Constant.linkWordToInt;
 import static db.pitt.chatbotbackendsupport.constant.Constant.wordToInt;
@@ -23,494 +24,1039 @@ public class ExtractTime {
      * Arrival at 10 am, departure  11 o'clock
      * Either 11 am or pm will not work in this case.
      */
-    public Response DepartureAmbiguity(int departureHour,
-                                       int departureMin,
-                                       int arrivalHour,
-                                       int arrivalMin){
-        if(departureHour == 12){
-            departureHour = 0;
-        }
-        Response response = new Response();
-        response.code = 7;
-        response.time = new Time(departureHour,departureMin);
-        // departure at 10 arrival at 11
-        if(departureHour < arrivalHour){
-            if(departureHour +12 < arrivalHour){
-                response.time.hour = departureHour+ 12;
-                return response;
-            } else if (departureHour+12 == arrivalHour) {
-                if(departureMin < arrivalMin){
-                    response.time.hour = departureHour+ 12;
-                    return response;
-                }else {
-                    return response;
-                }
-            }else {
-                return response;
-            }
-        } else if (departureHour == arrivalHour) {
-            if(departureMin < arrivalMin){
-                return response;
-            }else {
-                response.code = 8;
-                return response;
-            }
-        }else {
-            // Example : departure at 11 arrival at 10
-            response.code = 8;
-            return response;
-        }
-    }
-    /**
-     * TODO :Ambiguity , 20-5 - only for Hyphenated word
-     */
-    public Response RE(String input) {
-        String[] words = input.split(" ");
+//    public Response DepartureAmbiguity(int departureHour,
+//                                       int departureMin,
+//                                       int arrivalHour,
+//                                       int arrivalMin){
+//        if(departureHour == 12){
+//            departureHour = 0;
+//        }
+//        Response response = new Response();
+//        response.code = 7;
+//        response.time = new Time(departureHour,departureMin);
+//        // departure at 10 arrival at 11
+//        if(departureHour < arrivalHour){
+//            if(departureHour +12 < arrivalHour){
+//                response.time.hour = departureHour+ 12;
+//                return response;
+//            } else if (departureHour+12 == arrivalHour) {
+//                if(departureMin < arrivalMin){
+//                    response.time.hour = departureHour+ 12;
+//                    return response;
+//                }else {
+//                    return response;
+//                }
+//            }else {
+//                return response;
+//            }
+//        } else if (departureHour == arrivalHour) {
+//            if(departureMin < arrivalMin){
+//                return response;
+//            }else {
+//                response.code = 8;
+//                return response;
+//            }
+//        }else {
+//            // Example : departure at 11 arrival at 10
+//            response.code = 8;
+//            return response;
+//        }
+//    }
 
-        HashMap<Integer,Integer> indexInteger= new HashMap<>(); // Records every Integer we extract and record it and its position
+
+    /**
+     *  Time Units:
+     *  1. HHMM Pattern
+     *  two thirty-four (234)
+     *  1800
+     *  1:30
+     *
+     *  2. HH Pattern
+     *  3 o'clock
+     *  6 am
+     *
+     *  3. Keyword:
+     *  noon
+     *  now
+     *
+     *  4. Possible Time or Time Duration
+     *  three
+     *
+     *  5. Possible Time Duration
+     *  Quarter
+     *  Half
+     *
+     *  6. Time Duration
+     *  15 minutes
+     *  30 minutes
+     *  3 hours
+     *  half hour/ half of an hour
+     *
+     *  Relative time
+     *  quarter after noon
+     *  quarter after three
+     *  10 minutes prior to the arrival
+     *  five past three
+     *  30 minutes from now
+     *  I need to be there in 30 minutes
+     */
+
+    /**
+     * First Round:
+     *  Extract
+     *      Possible Time
+     *      Time Duration
+     *      AMPM indication
+     *
+     * Second Round:
+     *  Get fixed Time by
+     *  keyword
+     *      ： -> hh : mm
+     *      am pm -> number am/pm
+     *
+     * Third Round:
+     *  Based on keyword such as prior, .... Calculate relative time
+     *
+     * Fourth Round:
+     *  Identify AM PM or Ambiguity
+     */
+    public static Response RE(String input) {
+        String[] words = Util.splitByNumber(input);
+        Map<Integer,Time> indexTime= new TreeMap<>();
+
+        // First Round
         for (int i = 0; i < words.length; i++) {
             String word = words[i];
-
-            /* If found key word To/Past,
-               Check  MM （minute[s]) TO/PAST HH  Pattern
-               Ambiguity exists in this pattern(am or pm)
-            */
-            if((i+1 < words.length) && (word.equalsIgnoreCase("to") || word.equalsIgnoreCase("past"))){
-
-                // Extract the minute
-                Integer min = null;
-                if(indexInteger.containsKey(i-1)){
-                    //One Possible Pattern:  m + past/to + h
-                    min = indexInteger.get(i-1);
-                }else{
-                    //The other Possible Pattern: m minute + past/to + h
-                    if(words[i-1].toLowerCase().contains("minute") && indexInteger.containsKey(i-2)){
-                        min = indexInteger.get(i-2);
-                    }
-                }
-                if(min == null || !isValidMinute(min)) continue;
-
-                // Extract Hour
-                Integer hour = extractInt(words[i+1]);
-                indexInteger.put(i+1,hour);
-                if(hour != null && is12HourSystem(hour)){
-                    // Set Ambiguity Code
-                    Response response = new Response();
-                    response.code = 1;
-                    if(word.equalsIgnoreCase("to")){
-                        response.time = new Time(hour-1,60-min);
-                    }else{
-                        response.time = new Time(hour,min);
-                    }
-                    return response;
-                }
-            }
-
-            /* Check HH:MM / HHMM Pattern */
-            Response response = extractHHMM(word,words,i,indexInteger);
-            if(response.code == 10){
-                // Check the next word is PM/AM
-                int XM  = 0; // 0 : not exist , 1:am , 2:pm
-                if( i+1<words.length){
-                    if(words[i+1].toLowerCase().contains("am")){
-                        XM = 1;
-                    }
-                    if(words[i+1].toLowerCase().contains("pm")){
-                        XM = 2;
-                    }
-                }
-
-                // Conflict : If the hour is already grater than 12 or equal to 0
-                if(response.time.hour>=13 || response.time.hour ==0){
-                    response.code = 2;
-                    return response;
-                }
-
-                response.code = 0;
-                if(XM == 2){
-                    if(response.time.hour != 12) {
-                        response.time.hour += 12;
-                    }
-                    return response;
-                }
-
-                if(XM == 1){
-                    if(response.time.hour == 12){
-                        response.time.hour -= 12;
-                    }
-                    return response;
-                }
-
-                // TODO: Ambiguity happens
-                response.code = 1;
-                return response;
-            }
-
-            /* If we found the word is a number
-            Check whether match
-                HH MM [pm/am] Pattern
-            or  HH pm/am Pattern
-            */
-            Integer possibleInt = extractInt(word);
-            if(possibleInt != null){
-                // Collect a number
-                indexInteger.put(i,possibleInt);
-
-                // Whether the previous word is also a number
-                // Then match the pattern HH MM [pm or am]
-                if(indexInteger.containsKey(i-1) && isValidMinute(possibleInt)){
-                    int hour= indexInteger.get(i-1);
-                    if(i+1 < words.length){
-                        if( isPM(words[i+1])|| isAM(words[i+1])){
-                            //Possible Conflict happens,such as 13am 13pm
-                            if(!is12HourSystem(hour)){
-                                response.code = 2;
-                                response.time = new Time(hour,possibleInt);
-                                return response;
-                            }
-                            response.code = 0;
-                            if(isPM(words[i+1])){
-                                if(hour == 12) {
-                                    response.time = new Time(12, possibleInt);
-                                }else{
-                                    response.time = new Time(hour + 12, possibleInt);
-                                }
-                            }else {
-                                if( hour == 12){
-                                    response.time = new Time(0, possibleInt);
-                                }else {
-                                    response.time = new Time(hour, possibleInt);
-                                }
-                            }
-                            return response;
-                        }
-                        else {
-                            response.code = 0;
-                            response.time = new Time(hour, possibleInt);
-                            // Ambiguity happens
-                            if(hour<12){
-                                response.code = 1;
-                            }
-                            return response;
-                        }
-                    }
-                    else{
-                        response.code = 0;
-                        response.time = new Time(hour, possibleInt);
-                        // Ambiguity happens
-                        if(hour<12){
-                            response.code = 1;
-                        }
-                        return response;
-                    }
-                }
-                else {
-                    // Check the pattern HH pm/am
-                    if (isValidHour(possibleInt) &&(i + 1 < words.length) && ( isPM(words[i + 1]) || isAM(words[i + 1]))) {
-                        int hour = possibleInt;
-                        // Possible Conflict
-                        if(!is12HourSystem(hour)){
-                            response.code = 2;
-                            response.time = new Time(hour,0);
-                            return response;
-                        }
-                        response.code = 0;
-                        if (isPM(words[i + 1])) {
-                            if(hour == 12){ // 12pm - 12:00
-                                response.time = new Time(12,0);
-                            }else{
-                                response.time = new Time(hour+12,0);
-                            }
-                        } else {
-                            if(hour == 12){ // 12am -0:00
-                                response.time = new Time(0,0);
-                            }else{
-                                response.time = new Time(hour,0);
-                            }
-                        }
-                        return response;
-                    }
-                }
+            // Case 1. duration:  quarter, minutes ,hours ,half
+            // Case 2. single number 10/ 3 / thirty-four ....
+            // Case 3. clock
+            // Case 4. pm am morning .....
+            // Case 5. specific time: noon midday...
+            if(Case1(indexTime,words,word,i)){
                 continue;
             }
-
-            /* Resolve Bad Case : hhPM, such as 2PM */
-            if(isAM(word) || isPM(word)){
-                String hourString= null;
-                boolean isAM = true;
-                if(word.toLowerCase().contains("am")) {
-                    hourString = word.toLowerCase().split("am")[0];
-                }
-                if(word.toLowerCase().contains("a.m")) {
-                    hourString = word.toLowerCase().split("a.m")[0];
-                }
-                if(word.toLowerCase().contains("pm")) {
-                    hourString = word.toLowerCase().split("pm")[0];
-                    isAM = false;
-                }
-                if(word.toLowerCase().contains("p.m")) {
-                    hourString = word.toLowerCase().split("p.m")[0];
-                    isAM = false;
-                }
-                Integer hour = extractInt(hourString);
-                if(hour != null && isValidHour(hour)){
-                    response.code = 0;
-                    if(isValid12HourTimeSystem(hour)){
-                        if(isAM){
-                            if(hour == 12){
-                                response.time = new Time(0,0);
-                            }else {
-                                response.time = new Time(hour,0);
-                            }
-                        }else{
-                            if(hour == 12){
-                                response.time = new Time(12,0);
-                            }else {
-                                response.time = new Time(hour+12,0);
-                            }
-                        }
-                        return response;
-                    }else{
-                        response.code = 2;
-                        return response;
-                    }
-                }
+            if(Case2(indexTime,words,word,i)){
+                continue;
             }
-
-            /* If the word contains Key clock */
-            if(word.toLowerCase().contains("clock")){
-                // Check the last index, whether we match the pattern hour clock
-                if(indexInteger.containsKey(i-1)){
-                    int hour = indexInteger.get(i-1);
-                    if(is12HourSystem(hour)){
-                        //Ambiguity happens
-                        response.time = new Time(hour,0);
-                        response.code = 1;
-                        return response;
-                    }
-                    if(isValidHour(hour)){
-                        response.code = 0;
-                        response.time = new Time(hour,0);
-                        return response;
-                    }else{
-                        // Not valid hour, continue
-                        continue;
-                    }
-                }
+            if(Case3(indexTime,words,word,i)){
+                continue;
             }
-
-            /* If the word Match Key Word midday noon midnight */
-            if(word.equalsIgnoreCase("noon") || word.equalsIgnoreCase("midday")){
-                response.code = 0;
-                response.time = new Time(12,0);
-                return response;
+            if(Case4(indexTime,words,word,i)){
+                continue;
             }
-
-            if(word.equalsIgnoreCase("midnight")){
-                response.code = 0;
-                response.time = new Time(0,0);
-                return response;
+            if(Case5(indexTime,words,word,i)){
+                continue;
             }
         }
+
+        // Second Round
+        for (int i = 0; i < words.length; i++) {
+            String word = words[i];
+            Case6(indexTime,words,word,i);
+        }
+
+        /**
+         * Extract Time Unit Test:
+         */
+//        System.out.println("Extract Time Unit Test ----");
+//        for(Map.Entry<Integer,Time> entry : indexTime.entrySet()) {
+//            Integer pos = entry.getKey();
+//            Time t =  entry.getValue();
+//            System.out.println("Pos" + pos+ " ,"+t);
+//        }
+//        System.out.println(" End. ");
+
+        // Third Round
+        for (int i = 0; i < words.length; i++) {
+            String word = words[i];
+            Case7(indexTime,words,word,i);
+        }
+
+        /**
+         * Relative Time Test:
+         */
+//        System.out.println("Relative Time Unit Test ----");
+//        for(Map.Entry<Integer,Time> entry : indexTime.entrySet()) {
+//            Integer pos = entry.getKey();
+//            Time t =  entry.getValue();
+//            System.out.println("Pos" + pos+ " ,"+t);
+//        }
+//        System.out.println(" End. ");
+
+        // Fourth Round
+        Time answer =  Case8(indexTime);
         Response response = new Response();
-        response.code = 5;
-        if(!indexInteger.isEmpty()) {
-            // TODO Ambiguity: Does  11 can count as 11 o'clock ?
-            for(int number : indexInteger.values()){
-                if(isValidHour(number)){
-                    if(is12HourSystem(number)){
-                        // Ambiguity am or pm
-                        response.code = 1;
-                        response.time = new Time(number,0);
-                    }else{
-                        // No Ambiguity
-                        response.code = 0;
-                        response.time = new Time(number,0);
-                        return  response;
-                    }
-                }
-            }
+        if(answer.flag ==3 ){
+            response.code = 0;
+            response.time = answer;
+        }
+        else if(answer.flag == 2){
+            response.code = 1;
+            response.time = answer;
+        }
+        else {
+            response.code = 5;
         }
         return response;
     }
 
+    /**
+     * Case 1. Duration Pattern : quarter, minutes ,hours ,half
+     */
+    public static  boolean Case1(Map<Integer,Time> indexTime,String[] words,String word,int i){
+        boolean match = false;
+        Time time = new Time(4);
+        if(word.contains("minute")|| word.contains("min")){
+            // Check last position
+            if(indexTime.containsKey(i-1) && indexTime.get(i-1).flag == 1){
+                match = true;
+                time.durationHour  = indexTime.get(i-1).number/60;
+                time.durationMin = indexTime.get(i-1).number%60;
+                indexTime.remove(i-1);
+                indexTime.put(i,time);
+            }
+        }else if(word.contains("hour")){
+            // Check last position
+            if(indexTime.containsKey(i-1) && indexTime.get(i-1).flag == 1){
+                if(indexTime.get(i-1).number<24) {
+                    match = true;
+                    time.durationHour = indexTime.get(i - 1).number;
+                    time.durationMin = 0;
+                    indexTime.remove(i - 1);
+                    indexTime.put(i, time);
+                }
+            }
+        }else if(word.contains("quarter")){
+            // Check the last word one quarter / 2 quarters / 3 quarters
+            if(indexTime.containsKey(i-1) && indexTime.get(i-1).flag == 1){
+                if(indexTime.get(i-1).number<4 && indexTime.get(i-1).number>0) {
+                    match = true;
+                    time.durationHour = 0;
+                    time.durationMin = indexTime.get(i-1).number*15;
+                    indexTime.remove(i - 1);
+                    indexTime.put(i, time);
+                }
+            }else{
+                match = true;
+                time.durationHour = 0;
+                time.durationMin = 15;
+                indexTime.remove(i - 1);
+                indexTime.put(i, time);
+            }
+
+        } else if(word.contains("half")){
+            match = true;
+            time.durationHour = 0;
+            time.durationMin = 30;
+            indexTime.put(i, time);
+        }
+        return match;
+    }
 
     /**
-     *  If the word match the expression/format hh:mm or hhmm
-     *  we will extract the time
-     *  Attention:
-     *      hhmm must grater than 100 and less than 2459 ..
-     *   && 0<= hh <= 23
-     *   && 0<= mm <= 59
+     * Case 2. Extract Single Number
      *
-     *   Resolve Bad Cases: hh :mm or hh: mm
-     *   or hh : mm
+     *  x can be number/ half / quarter......
+     *  x> 100 only time
+     *  x 60- 99 minutes duration
+     *  x 24- 59 part of time, minutes duration
+     *  x 0 - 23 time, part of time ,minutes duration, hour duration
+     *
+     * Possible Scenario
+     * Scenario one : Time
+     *  1800
+     *  0001
+     *
+     * Scenario two : Possible Time/ Part of Time
+     *  1. two thirty-four (234)  - two cases
+     *  3. 18:00 / 2:34
+     *  4. 3 o'clock/am
+     *  5. five past three
+     *
+     * Scenario three : Possible Time Duration
+     *  6. two hour/ quarters
      */
-    public Response extractHHMM(String word,String[] words,int i,HashMap<Integer,Integer> indexInteger){
-        Response response = new Response();
-        response.code = 11;
-        if( word.contains(":")){
+    public static boolean Case2(Map<Integer,Time> indexTime,String[] words,String word,int i){
+        Integer number = Util.extractInt(word);
+        if(number != null){
+            Time time = new Time(3);
+            // Scenario one
+            // Special case for 001 -> 059 or 0001 -> 0059
+            if(Util.isNum(word.charAt(0))  &&(word.length() == 4 || word.length() == 3) && Util.isValidMinute(number)){
+                time.hour = 0;
+                time.minute = number;
+                indexTime.put(i,time);
+                return true;
+            }
+
+            if(number >= 100){
+                int minute= number%100;
+                int hour = number/100;
+                if(Util.isValidHour(hour) && Util.isValidMinute(minute)){
+                    time.hour = hour;
+                    time.minute = minute;
+                    if(Util.isValid12HourTimeSystem(hour)){
+                        time.flag = 2; // ambiguity
+                        time.minute2 = minute;
+                        time.minute = minute;
+                        if(hour == 12){
+                            time.hour = 12;
+                            time.hour2 = 0;
+                        }else{
+                            time.hour = hour + 12;
+                            time.hour2 = hour;
+                        }
+                    }
+                    indexTime.put(i,time);
+                    return true;
+                }
+                return false;
+            }
+
+            //  Scenario two
+            // Check the last position whether it's a number
+            if(indexTime.containsKey(i-1) && indexTime.get(i-1).flag == 1){
+                // HH MM Pattern
+                if(Util.isValidHour( indexTime.get(i-1).number) && Util.isValidMinute( number ) ){
+                    time.hour = indexTime.get(i-1).number;
+                    time.minute = number;
+
+                    if(Util.isValid12HourTimeSystem(indexTime.get(i-1).number)){
+                        time.flag = 2; // ambiguity
+                        time.minute2 = number;
+                        time.minute = number;
+                        if(indexTime.get(i-1).number == 12){
+                            time.hour = 12;
+                            time.hour2 = 0;
+                        }else{
+                            time.hour = indexTime.get(i-1).number + 12;
+                            time.hour2 = indexTime.get(i-1).number;
+                        }
+                    }
+                    indexTime.put(i,time);
+                    indexTime.remove(i-1);
+                    return true;
+                }
+            }
+
+            time.flag = 1;
+            time.number = number;
+            indexTime.put(i,time);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Case 3. clock
+     * 9 o'clock
+     */
+    public static boolean Case3(Map<Integer,Time> indexTime,String[] words,String word,int i){
+        if(word.contains("clock")) {
+
+            // Check the last position
+            if (indexTime.containsKey(i - 1) && indexTime.get(i - 1).flag == 1) {
+                int number = indexTime.get(i - 1).number;
+                Time time = new Time(3);
+                if (Util.isValidHour(number)) {
+                    time.hour = number;
+                    time.minute = 0;
+                    if (Util.isValid12HourTimeSystem(number)) {
+                        time.flag = 2;// ambiguity
+                        time.minute2 = 0;
+                        time.minute = 0;
+                        if(number == 12){
+                            time.hour = 12;
+                            time.hour2 = 0;
+                        }else{
+                            time.hour = number + 12;
+                            time.hour2 = number;
+                        }
+                    }
+                    indexTime.put(i, time);
+                    indexTime.remove(i - 1);
+                    return true;
+                }
+            }
+            // Consider the edge case 6 o clock / 6 o' clock
+            if (i-2>=0 && (words[i-1].equals("o") || words[i-1].equals("o'") ) && indexTime.containsKey(i - 2) && indexTime.get(i - 2).flag == 1) {
+                int number = indexTime.get(i - 2).number;
+                Time time = new Time(3);
+                if (Util.isValidHour(number)) {
+                    time.hour = number;
+                    time.minute = 0;
+                    if (Util.isValid12HourTimeSystem(number)) {
+                        time.flag = 2;// ambiguity
+                        time.minute2 = 0;
+                        time.minute = 0;
+                        if(number == 12){
+                            time.hour = 12;
+                            time.hour2 = 0;
+                        }else{
+                            time.hour = number + 12;
+                            time.hour2 = number;
+                        }
+                    }
+                    indexTime.put(i, time);
+                    indexTime.remove(i - 2);
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+
+    /**
+     * Case 4. specific time:
+     * noon  - 12:00
+     * midday - 12:00
+     * midnight - 0:00
+     * now
+     */
+    public static boolean Case4(Map<Integer,Time> indexTime,String[] words,String word,int i){
+        boolean match = false;
+        Time time = new Time(3);
+        if(word.equals("noon") || word.equals("midday") ){
+            match = true;
+            time.hour = 12;
+            time.minute = 0;
+            indexTime.put(i,time);
+        }
+        else if (word.equals("midnight")) {
+            match = true;
+            time.hour = 0;
+            time.minute = 0;
+            indexTime.put(i,time);
+        } else if (word.equals("now")) {
+            match = true;
+            time = Util.getNow();
+            indexTime.put(i,time);
+        }
+        return match;
+    }
+
+    /**
+     * Case 5. indicate PM and AM
+     * AM: am a.m morning dawn sunrise (ante meridiem)
+     * PM: pm p.m evening afternoon dusk (post meridiem)
+     */
+    public static  boolean Case5(Map<Integer,Time> indexTime,String[] words,String word,int i){
+        boolean match = false;
+        Time time = new Time(5);
+        if(word.equals("morning") ||word.equals("dawn")|| word.equals("sunrise") ){
+            time.flag = 6;
+            match = true;
+            time.ampmFlag = 1;
+            indexTime.put(i,time);
+        } else if (word.equals("am") || word.equals("a.m")) {
+            match = true;
+            time.ampmFlag = 1;
+            indexTime.put(i,time);
+        } else if (word.equals("evening") ||word.equals("afternoon")|| word.equals("dusk") ) {
+            time.flag = 6;
+            match = true;
+            time.ampmFlag = 2;
+            indexTime.put(i,time);
+        } else if (word.equals("pm") || word.equals("p.m")) {
+            match = true;
+            time.ampmFlag = 2;
+            indexTime.put(i,time);
+        } else if (word.equals("meridiem")) {
+            // Check the last word
+            if(i-1>=0){
+                String lastWord = words[i-1];
+                if(lastWord.equals("ante")){
+                    match = true;
+                    time.ampmFlag = 1;
+                    indexTime.put(i,time);
+                } else if (lastWord.equals("post")) {
+                    match = true;
+                    time.ampmFlag = 2;
+                    indexTime.put(i,time);
+                }
+            }
+        }
+        return match;
+    }
+
+    /**
+     * Case 6.
+     * : -> 3:2
+     * 6pm -> 6:00
+     */
+    public static boolean Case6(Map<Integer,Time> indexTime,String[] words,String word,int i){
+        Time t = indexTime.get(i);
+        if(word.contains(":")){
+            Time time = new Time(3);
             String[] letters = word.split(":");
             if(letters.length>2){
-                return response;
-            }else if(letters.length == 2){
-                // Two Possible Cases 1. :mm  2. hh:mm
-                Integer hour = extractInt(letters[0]);
-                Integer minute = extractInt(letters[1]);
-                // hh:mm
-                if(hour != null && minute != null && isValidHour(hour) && isValidMinute(minute)) {
-                    response.code = 10;
-                    response.time = new Time(hour,minute);
-                }
-                // :mm
-                if(hour == null && letters[0].isEmpty() && minute != null && isValidMinute(minute)){
-                    if(indexInteger.containsKey(i-1) && isValidHour(indexInteger.get(i-1))){
-                        response.code = 10;
-                        response.time = new Time(indexInteger.get(i-1),minute);
+                // hh:mm:ss
+                // :mm:ss
+                Integer minute = Util.extractInt(letters[1]);
+                if(minute != null && Util.isValidMinute(minute)){
+                    if(letters[0].length() == 0){
+                        // :mm:ss Check the previous number
+                        if(indexTime.containsKey(i-1) && indexTime.get(i-1).flag == 1){
+                            int h = indexTime.get(i-1).number;
+                            if(Util.isValidHour(h)){
+                                time.hour = h;
+                                time.minute = minute;
+
+                                if(Util.isValid12HourTimeSystem(h)){
+                                    time.flag = 2;// ambiguity
+                                    time.minute2 = minute;
+                                    time.minute = minute;
+                                    if(h == 12){
+                                        time.hour = 12;
+                                        time.hour2 = 0;
+                                    }else{
+                                        time.hour = h+ 12;
+                                        time.hour2 = h;
+                                    }
+                                }
+                                indexTime.remove(i-1);
+                                indexTime.put(i,time);
+                                return true;
+                            }
+                        }
+                    }else{
+                        // hh:mm:ss
+                        Integer hour = Util.extractInt(letters[0]);
+                        if(hour != null && Util.isValidHour(hour)){
+                            time.hour = hour;
+                            time.minute = minute;
+                            if(Util.isValid12HourTimeSystem(hour)){
+                                time.flag = 2;// ambiguity
+                                time.minute2 = minute;
+                                time.minute = minute;
+                                if(hour == 12){
+                                    time.hour = 12;
+                                    time.hour2 = 0;
+                                }else{
+                                    time.hour = hour+ 12;
+                                    time.hour2 = hour;
+                                }
+                            }
+                            indexTime.remove(i-1);
+                            indexTime.put(i,time);
+                            return true;
+                        }
                     }
                 }
-                return response;
-            } else if (letters.length ==1 ) {
-                // hh: mm
-                Integer hour = extractInt(letters[0]);
-                if(hour !=null && isValidHour(hour) && (i+1) < words.length){
-                    Integer minute = extractInt(words[i+1]);
-                    if(minute != null && isValidMinute(minute)){
-                        response.code = 10;
-                        response.time = new Time(hour,minute);
-                    }
-                }
-                return response;
-            }else{
-                // letters length == 0
-                Integer hour = indexInteger.get(i-1);
-                if(hour !=null && isValidHour(hour) && (i+1) < words.length){
-                    Integer minute = extractInt(words[i+1]);
-                    if(minute != null && isValidMinute(minute)){
-                        response.code = 10;
-                        response.time = new Time(hour,minute);
-                    }
-                }
-                return response;
             }
+            else if(letters.length == 2){
+                // Two Possible Cases 1. :mm  2. hh:mm
+                Integer minute = Util.extractInt(letters[1]);
+                // :mm
+                if(letters[0].length() == 0 && minute != null && Util.isValidMinute(minute)){
+                    // Check the previous number
+                    if(indexTime.containsKey(i-1) && indexTime.get(i-1).flag == 1){
+                        int h = indexTime.get(i-1).number;
+                        if(Util.isValidHour(h)){
+                            time.hour = h;
+                            time.minute = minute;
+                            if(Util.isValid12HourTimeSystem(h)){
+                                time.flag = 2;// ambiguity
+                                time.minute2 = minute;
+                                time.minute = minute;
+                                if(h == 12){
+                                    time.hour = 12;
+                                    time.hour2 = 0;
+                                }else{
+                                    time.hour = h+ 12;
+                                    time.hour2 = h;
+                                }
+                            }
+                            indexTime.remove(i-1);
+                            indexTime.put(i,time);
+                            return true;
+                        }
+                    }
+                }
+
+                Integer hour = Util.extractInt(letters[0]);
+                // hh:mm
+                if(hour != null && minute != null && Util.isValidHour(hour) && Util.isValidMinute(minute)) {
+                    time.hour = hour;
+                    time.minute = minute;
+                    if (Util.isValid12HourTimeSystem(hour)) {
+                        time.flag = 2;// ambiguity
+                        time.minute2 = minute;
+                        time.minute = minute;
+                        if (hour == 12) {
+                            time.hour = 12;
+                            time.hour2 = 0;
+                        } else {
+                            time.hour = hour + 12;
+                            time.hour2 = hour;
+                        }
+                    }
+                    indexTime.put(i, time);
+                    return true;
+                }
+
+            }
+            else if (letters.length ==1 ) {
+                // hh: mm
+                Integer hour = Util.extractInt(letters[0]);
+                // Check the next number
+                if(hour !=null && Util.isValidHour(hour) ){
+                    if(indexTime.containsKey(i+1) && indexTime.get(i+1).flag == 1){
+                        int min =  indexTime.get(i+1).number;
+                        if(Util.isValidMinute(min)){
+                            time.hour = hour;
+                            time.minute = min;
+                            if(Util.isValid12HourTimeSystem(hour)){
+                                time.flag = 2;// ambiguity
+                                time.minute2 = min;
+                                time.minute = min;
+                                if (hour == 12) {
+                                    time.hour = 12;
+                                    time.hour2 = 0;
+                                } else {
+                                    time.hour = hour + 12;
+                                    time.hour2 = hour;
+                                }
+                            }
+                            indexTime.remove(i+1);
+                            indexTime.put(i,time);
+                            return true;
+                        }
+                    }
+                }
+            }
+            else{
+                // letters length == 0 hh : mm
+                // Check the previous and next number
+                if(indexTime.containsKey(i-1) && indexTime.get(i-1).flag == 1 && Util.isValidHour(indexTime.get(i-1).number)){
+                    int hour = indexTime.get(i-1).number;
+                    if(indexTime.containsKey(i+1) && indexTime.get(i+1).flag == 1 && Util.isValidMinute(indexTime.get(i+1).number)){
+                        int minute = indexTime.get(i+1).number;
+                        time.hour = hour;
+                        time.minute = minute;
+                        if(Util.isValid12HourTimeSystem(hour)){
+                            time.flag = 2;// ambiguity
+                            time.minute2 = minute;
+                            time.minute = minute;
+                            if (hour == 12) {
+                                time.hour = 12;
+                                time.hour2 = 0;
+                            } else {
+                                time.hour = hour + 12;
+                                time.hour2 = hour;
+                            }
+                        }
+                        indexTime.remove(i-1);
+                        indexTime.remove(i+1);
+                        indexTime.put(i,time);
+                        return true;
+                    }
+                }
+            }
+        }
+        else if (t!= null && t.flag == 5) {
+            for (int j = i - 1; j >= 0; j--) {
+                if (indexTime.get(j) != null) {
+                    // Number or Ambiguity Time
+                    Time candidate = indexTime.get(j);
+                    if (candidate.flag == 3) {
+                        // TODO : Conflict
+                        break;
+                    }
+                    if (candidate.flag == 2) {
+                        // Remove the previous Time unit and add new one
+                        indexTime.remove(j);
+                        indexTime.remove(i);
+
+                        // Resolve ambiguity
+                        Time newTime = Util.resolveAmbiguity(candidate, t.ampmFlag);
+                        indexTime.put(i, newTime);
+                    } else if (candidate.flag == 1) {
+                        // Number x pm or am
+                        if (Util.isValid12HourTimeSystem(candidate.number)) {
+                            // Remove the previous Time unit and add new one
+                            indexTime.remove(j);
+                            indexTime.remove(i);
+                            Time newTime = new Time(3);
+                            newTime.hour = Util.transform12To24(candidate.number, t.ampmFlag);
+                            newTime.minute = 0;
+                            indexTime.put(i, newTime);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Case 7. resolve relative time
+     * "in"                 in duration(x minutes /hours)            example: in 30 minutes
+     * "later"              duration later (now)                     example: Two hours later
+     * "from, past, after"  duration from/past/after fixed time      example: 30 minutes from now , five past three , quarter after three
+     * "prior (to) / to "   duration prior (to) / to fixed time      example: three to five
+     */
+    public static boolean Case7(Map<Integer,Time> indexTime,String[] words,String word,int i){
+        if(word.equals("in")){
+            // now + duration
+            Time now = Util.getNow();
+            for(int j = i+1;j<words.length;j++){
+                // Find the duration TODO- possible time? in 30 in half?
+                if(indexTime.containsKey(j) && indexTime.get(j).flag == 4){
+                    Time relativeTime = Util.addTime(now,indexTime.get(j));
+                    if(relativeTime != null){
+                        indexTime.remove(j);
+                        indexTime.put(i,relativeTime);
+                        break;
+                    }
+                }
+            }
+        }
+        else if (word.equals("later")) {
+            // now + duration
+            Time now = Util.getNow();
+            for(int j = i-1;j>=0;j--){
+                // Find the duration TODO- possible time?  30 later?
+                if(indexTime.containsKey(j) && indexTime.get(j).flag == 4){
+                    Time relativeTime = Util.addTime(now,indexTime.get(j));
+                    if(relativeTime != null){
+                        indexTime.remove(j);
+                        indexTime.put(i,relativeTime);
+                        break;
+                    }
+                }
+            }
+        }
+        else if (word.equals("past") || word.equals("after") || word.equals("from") || word.equals("to") || word.equals("prior")) {
+            int durationIndex = -1;
+            // Find the duration or Possible Time
+            for(int j = i-1;j>=0;j--){
+                if(indexTime.containsKey(j) && (indexTime.get(j).flag == 4 || indexTime.get(j).flag == 1 )){
+                    if(indexTime.get(j).flag == 4) {
+                        durationIndex = j;
+                        break;
+                    }else{
+                        if(!word.equals("from")) {
+                            int number = indexTime.get(j).number;
+                            // Possible minutes TODO 59-99
+                            if (number >= 1 && number <= 59) {
+                                durationIndex = j;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if(durationIndex == -1){
+                return false;
+            }
+
+            int fixedIndex = -1;
+            // Find fixed time
+            for(int j = i;j<words.length;j++){
+                if(indexTime.containsKey(j) && (indexTime.get(j).flag == 1 || indexTime.get(j).flag == 2 || indexTime.get(j).flag==3 )){
+                    if(indexTime.get(j).flag == 1){
+                        int number = indexTime.get(j).number;
+                        // Possible hour
+                        if(number>=0 && number <= 23){
+                            fixedIndex = j;
+                            break;
+                        }
+                    }else{
+                        fixedIndex = j;
+                        break;
+                    }
+                }
+            }
+            if(fixedIndex == -1){
+                return false;
+            }
+
+            // Calculate time
+            // Duration Part
+            Time duration = indexTime.get(durationIndex);
+            if(duration.flag == 1){
+                duration.flag = 4;
+                duration.durationHour = 0;
+                duration.durationMin = duration.number;
+            }
+            indexTime.remove(durationIndex);
+
+            // Fixed Time Part
+            Time time = indexTime.get(fixedIndex);
+            if(time.flag == 1){
+                if(Util.isValid12HourTimeSystem(time.number)){
+                    time.flag = 2;
+                    if(time.number == 12){
+                        time.hour = 12;
+                        time.hour2 = 0;
+                    }else{
+                        time.hour = time.number +12;
+                        time.hour2 = time.number;
+                    }
+                    time.minute = 0;
+                    time.minute2 = 0;
+                }else{
+                    time.flag = 3;
+                    time.hour = time.number;
+                    time.minute = 0;
+                }
+            }
+            indexTime.remove(fixedIndex);
+            Time relativeTime;
+            if(word.equals("to")|| word.equals("prior")){
+                relativeTime = Util.subTime(time,duration);
+            }else {
+                relativeTime = Util.addTime(time,duration);
+            }
+            // Avoid Prior To
+            if(word.equals("prior") && i+1< words.length && words[i+1].equals("to")){
+                i++;
+            }
+            if(relativeTime != null) {
+                indexTime.put(i, relativeTime);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Case 8. resolve AM PM
+     *  Possible Combination
+     *  AMPM Intention +  (Ambiguity Time OR Possible Time)
+     *  (Ambiguity Time OR Possible Time)+ AMPM Intention
+     *
+     *  Idea1. Extract the first Possibility (Try First)
+     *  Idea2. Extract all possibilities
+     *  Idea3. Extra functionality : Compare ampm flag with real time am pm ? Example : pm - 13:00
+     */
+    public static Time Case8(Map<Integer,Time> indexTime){
+        Time time = new Time(-1);
+
+        ArrayList<Integer> indices = new ArrayList<>();
+        indices.addAll( ((TreeMap) indexTime).navigableKeySet());
+
+        int ampmFlag = 0;
+        boolean ambiguity = true;
+        int candidateHour = -1;
+        int candidateMin = -1;
+        int candidateIndex = -1;
+        Time ambiguityCandidate = new Time(2);
+        int ambiguityCandidateIndex = -1;
+        for(int i = 0 ; i< indices.size();i++){
+            Time t = indexTime.get(indices.get(i));
+            if(t.flag == -1 || t.flag == 4 || t.flag == 5){
+                continue;
+            }
+            if(t.flag == 1){
+                int number = t.number;
+                if(number <24 ){
+                    // Possible Candidate
+                    if(Util.isValid12HourTimeSystem(number)){
+                        ambiguity = true;
+                        if(ampmFlag != 0){
+                            time.flag = 3;
+                            time.hour = Util.transform12To24(number,ampmFlag);
+                            time.minute = 0;
+                            return time;
+                        }
+                    }else {
+                        ambiguity = false;
+                        if(ampmFlag != 0){
+                            time.flag = 3;
+                            time.hour = Util.transform12To24(number,ampmFlag);
+                            time.minute = 0;
+                            return time;
+                        }
+                    }
+                    // It's a candidate
+                    candidateIndex = i;
+                    candidateHour = number;
+                    candidateMin = 0;
+                }
+            }
+            else if (t.flag == 3 ) {
+                // TODO Might Compare with ampm flag intention Later (Conflict Case) !! E.X. 13pm in the morning
+                time.flag = 3;
+                time.hour = t.hour;
+                time.minute = t.minute;
+                return time;
+            }
+            else if (t.flag == 2) {
+                ambiguity = true;
+//                ambiguityCandidateHour = t.hour;
+//                ambiguityCandidateMin= t.minute;
+                ambiguityCandidate = t;
+                ambiguityCandidateIndex = i;
+                //  System.out.println("----- Test "+t.hour +":"+t.minute);
+            }
+            /**
+             else if (t.flag == 5) {
+             // Choose the closest Candidate
+             if(candidateIndex == -1){
+             if(ambiguityCandidateIndex== -1){
+             // No Candidate
+             continue;
+             }else{
+             // Choose Ambiguity Candidate
+             //                        time.flag = 3;
+             //                        time.hour = Util.transform12To24(ambiguityCandidateHour,t.ampmFlag);
+             //                        time.minute = ambiguityCandidateMin;
+             time = Util.resolveAmbiguity(ambiguityCandidate,ampmFlag);
+             return time;
+             }
+             }
+             else{
+             if(ambiguityCandidateIndex== -1){
+             // Choose number Candidate
+             if(ambiguity) {
+             time.flag = 3;
+             time.hour = Util.transform12To24(candidateHour, t.ampmFlag);
+             time.minute = candidateMin;
+             return time;
+             }else{
+             if(Util.compareAMPMFlag(candidateHour,t.ampmFlag)){
+             time.flag = 3;
+             time.hour = candidateHour;
+             time.minute = candidateMin;
+             return time;
+             }else{
+             // Clean the bad candidate Example 13 am, here 13 will be cleaned
+             candidateHour = -1;
+             candidateMin = -1;
+             candidateIndex = -1;
+             }
+             }
+             }else{
+             // Choose closet Candidate
+             if(ambiguityCandidateIndex > candidateIndex){
+             //                            time.flag = 3;
+             //                            time.hour = Util.transform12To24(ambiguityCandidateHour,t.ampmFlag);
+             //                            time.minute = ambiguityCandidateMin;
+             time = Util.resolveAmbiguity(ambiguityCandidate,ampmFlag);
+             return time;
+             }else {
+             // Choose number Candidate
+             if(ambiguity) {
+             time.flag = 3;
+             time.hour = Util.transform12To24(candidateHour, t.ampmFlag);
+             time.minute = candidateMin;
+             return time;
+             }else{
+             if(Util.compareAMPMFlag(candidateHour,t.ampmFlag)){
+             time.flag = 3;
+             time.hour = candidateHour;
+             time.minute = candidateMin;
+             return time;
+             }else{
+             // Clean the bad candidate Example 13 am, here 13 will be cleaned
+             candidateHour = -1;
+             candidateMin = -1;
+             candidateIndex = -1;
+             }
+             }
+             }
+             }
+             }
+             }
+             **/
+            else if (t.flag == 6) {
+                // Choose the closest Candidate
+                if(candidateIndex == -1){
+                    if(ambiguityCandidateIndex== -1){
+                        // No Candidate
+                        ampmFlag = t.ampmFlag;
+                        continue;
+                    }else{
+                        // Choose Ambiguity Candidate
+                        time = Util.resolveAmbiguity(ambiguityCandidate,ampmFlag);
+                        return time;
+                    }
+                }
+                else{
+                    if(ambiguityCandidateIndex== -1){
+                        // Choose number Candidate
+                        if(ambiguity) {
+                            time.flag = 3;
+                            time.hour = Util.transform12To24(candidateHour, t.ampmFlag);
+                            time.minute = candidateMin;
+                            return time;
+                        }else{
+                            if(Util.compareAMPMFlag(candidateHour,t.ampmFlag)){
+                                time.flag = 3;
+                                time.hour = candidateHour;
+                                time.minute = candidateMin;
+                                return time;
+                            }else{
+                                // Clean the bad candidate Example 13 am, here 13 will be cleaned
+                                candidateHour = -1;
+                                candidateMin = -1;
+                                candidateIndex = -1;
+                                // Set Flag
+                                ampmFlag = t.ampmFlag;
+                            }
+                        }
+                    }else{
+                        // Choose closet Candidate
+                        if(ambiguityCandidateIndex > candidateIndex){
+                            time = Util.resolveAmbiguity(ambiguityCandidate,ampmFlag);
+                            return time;
+                        }else {
+                            // Choose number Candidate
+                            if(ambiguity) {
+                                time.flag = 3;
+                                time.hour = Util.transform12To24(candidateHour, t.ampmFlag);
+                                time.minute = candidateMin;
+                                return time;
+                            }else{
+                                if(Util.compareAMPMFlag(candidateHour,t.ampmFlag)){
+                                    time.flag = 3;
+                                    time.hour = candidateHour;
+                                    time.minute = candidateMin;
+                                    return time;
+                                }else{
+                                    // Clean the bad candidate Example 13 am, here 13 will be cleaned
+                                    candidateHour = -1;
+                                    candidateMin = -1;
+                                    candidateIndex = -1;
+                                    // Set Flag
+                                    ampmFlag = t.ampmFlag;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Pick from candidate
+        // Priority - > Pick ambiguity Candidate First
+        if(ambiguityCandidateIndex!= -1){
+            time = ambiguityCandidate;
         }
         else{
-            Integer time = extractInt(word);
-            if(time!= null && time>= 100){
-                int minute= time%100;
-                int hour = time/100;
-                if(isValidHour(hour) && isValidMinute(minute) ){
-                    response.code = 10;
-                    response.time = new Time(hour,minute);
+            if(candidateIndex != -1){
+                if(ambiguity){
+                    time.flag = 2;
+                    if(candidateHour == 12){
+                        time.hour2 = 0;
+                        time.hour = 12;
+                    }else{
+                        time.hour2 = candidateHour;
+                        time.hour = candidateHour+12;
+                    }
+                    time.minute = candidateMin;
+                    time.minute2 = candidateMin;
+                }else{
+                    time.flag = 3;
+                    time.hour = candidateHour;
+                    time.minute = candidateMin;
                 }
             }
-            return response;
         }
+        return time;
     }
 
-    /**
-     * Number can be in two format
-     * 1. [Hyphenated] word
-     * twenty-five  (25)
-     * O-five       (5)
-     * five         (5)
-     * o            (0)
-     *
-     * 2. Number
-     * 25
-     * 5
-     * The function try to extract number if the input following the format we assume
-     * Return null if the function cannot recognize the number
-     */
-    public Integer extractInt(String word){
-        if(word.contains("-")){
-            String[] letters= word.split("-");
-            if(letters.length>2){
-                return null;
-            }else {
-                // Extract the first number zero or o or twenty.... fifty
-                Integer firstNumber = linkWordToInt.get(letters[0].toLowerCase());
-                // Extract second number
-                Integer secondNumber = wordToInt.get(letters[1].toLowerCase());
-                if(firstNumber != null && secondNumber != null && secondNumber<=9){
-                    return firstNumber + secondNumber;
-                }
-                return null;
-            }
-        }else{
-            return extractIntAtomic(word);
-        }
-    }
-
-    public  Integer extractIntAtomic(String letter){
-        // check whether is letter format (two) or number format (2)
-        if(letter.length()>0 && letter.charAt(0)>='0' && letter.charAt(0) <='9'){
-            try{
-                return Integer.parseInt(letter);
-            }catch (NumberFormatException e){
-                return null;
-            }
-        }else {
-            return wordToInt.get(letter);
-        }
-    }
-
-    /**
-     * The 12-hour clock is a time convention in which the 24 hours of the day are divided into two periods: a.m. and p.m.
-     * Each period consists of 12 hours numbered: 12 (acting as 0), 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 and 11.
-     * @param hour
-     * This method will check whether hour is valid in 12 hour clock system
-     */
-    private  boolean isValid12HourTimeSystem(int hour){
-        if(hour > 0 && hour <13){
-            return true;
-        }
-        return false;
-    }
-
-    private  boolean isValidMinute(int minute){
-        if(minute<0 || minute>59){
-            return false;
-        }
-        return true;
-
-    }
-
-    private  boolean isValidHour(int hour){
-        if(hour<0 || hour>23){
-            return false;
-        }
-        return true;
-    }
-
-    /**
-     * If the given hour is 0 or grater than 12, then the time system is 24 hour system
-     */
-    private boolean is24HourSystem(int hour){
-        if(hour ==0 || (hour>12 && hour<24)){
-            return true;
-        }
-        return false;
-    }
-
-    private boolean is12HourSystem(int hour){
-        if(hour>=1 && hour<=12){
-            return true;
-        }
-        return false;
-    }
-
-    private boolean isAM(String word){
-        if(word.toLowerCase().contains("am") || word.toLowerCase().contains("a.m")){
-            return true;
-        }
-        return false;
-    }
-
-    private boolean isPM(String word){
-        if(word.toLowerCase().contains("pm") || word.toLowerCase().contains("p.m")){
-            return true;
-        }
-        return false;
-    }
 }

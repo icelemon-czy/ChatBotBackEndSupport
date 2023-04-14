@@ -27,11 +27,9 @@ public class Controller {
         log.info("Regular expression input: " +input);
         Response response = extractTimeService.RE(input);
         if(response.code == 0){
-            log.info("RE Success " + response.time.hour+" "+response.time.minute);
+            log.info("RE Success");
         } else if (response.code == 1) {
             log.info("RE Ambiguity");
-        } else if (response.code == 2) {
-            log.info("RE Conflict");
         }else{
             log.info("RE Fail");
         }
@@ -44,15 +42,16 @@ public class Controller {
                                        @PathVariable("departureMin") int departureMin,
                                        @PathVariable("arrivalHour") int arrivalHour,
                                        @PathVariable("arrivalMin") int arrivalMin){
-        log.info("Resolve Departure Ambiguity "+"Arrival Time "+arrivalHour+":" +arrivalMin+
-                " Departure Time(Ambiguity) "+departureHour+":"+departureMin);
-        Response response = extractTimeService.DepartureAmbiguity(departureHour, departureMin, arrivalHour, arrivalMin);
-        if(response.code == 7){
-            log.info("DA Ambiguity Resolved ");
-        }else {
-            log.info("DA Ambiguity doesn't Resolved ");
-        }
-        return response;
+//        log.info("Resolve Departure Ambiguity "+"Arrival Time "+arrivalHour+":" +arrivalMin+
+//                " Departure Time(Ambiguity) "+departureHour+":"+departureMin);
+//        Response response = extractTimeService.DepartureAmbiguity(departureHour, departureMin, arrivalHour, arrivalMin);
+//        if(response.code == 7){
+//            log.info("DA Ambiguity Resolved ");
+//        }else {
+//            log.info("DA Ambiguity doesn't Resolved ");
+//        }
+//        return response;
+        return null;
     }
 
     @GetMapping("/yesmodel/{input}")
