@@ -33,9 +33,9 @@ public class ExtractTimeTest {
     @Test
     public void AmbiguityTest(){
         for (String input: Ambiguity_Input) {
-            System.out.println(input);
+           // System.out.println(input);
             System.out.println(extractTime.RE(input));
-            System.out.println("---------");
+         //   System.out.println("---------");
         }
     }
 
@@ -45,9 +45,9 @@ public class ExtractTimeTest {
     @Test
     public void SuccessTest(){
         for (String input: Success_Input) {
-            System.out.println(input);
+            //System.out.println(input);
             System.out.println(extractTime.RE(input));
-            System.out.println("---------");
+            //System.out.println("---------");
         }
     }
 
@@ -56,9 +56,9 @@ public class ExtractTimeTest {
     @Test
     public void FailTest(){
         for (String input: Fail_Input ) {
-            System.out.println(input);
+          //  System.out.println(input);
             System.out.println(extractTime.RE(input));
-            System.out.println("---------");
+           // System.out.println("---------");
         }
     }
 

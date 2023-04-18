@@ -16,52 +16,54 @@ import static db.pitt.chatbotbackendsupport.constant.Constant.wordToInt;
 @Service
 public class ExtractTime {
     /**
-     * Two cases
-     * 1. Ambiguity Resolved
-     * Arrival at 1 pm, departure 10 o'clock
-     * The algorithm will return 10:00 (10 am)
-     * 2. Cannot Resolve Ambiguity
-     * Arrival at 10 am, departure  11 o'clock
-     * Either 11 am or pm will not work in this case.
+     * Resolve Ambiguity
+     * Given the fact that arrival time must be later than the departure time.
+     * Choose the closest departure time  from possible time.
+     * For example , we extract two possible Departure  time : 10 or 22  and Arrival time is  23.
+     * Both 10 or 22 are appropriate, Return 22 since 22 is closet time.
+     *
+     * Input : Two candidate departure 1 and departure 2. And departure 1 <（earlier) departure 2.
      */
-//    public Response DepartureAmbiguity(int departureHour,
-//                                       int departureMin,
-//                                       int arrivalHour,
-//                                       int arrivalMin){
-//        if(departureHour == 12){
-//            departureHour = 0;
-//        }
-//        Response response = new Response();
-//        response.code = 7;
-//        response.time = new Time(departureHour,departureMin);
-//        // departure at 10 arrival at 11
-//        if(departureHour < arrivalHour){
-//            if(departureHour +12 < arrivalHour){
-//                response.time.hour = departureHour+ 12;
-//                return response;
-//            } else if (departureHour+12 == arrivalHour) {
-//                if(departureMin < arrivalMin){
-//                    response.time.hour = departureHour+ 12;
-//                    return response;
-//                }else {
-//                    return response;
-//                }
-//            }else {
-//                return response;
-//            }
-//        } else if (departureHour == arrivalHour) {
-//            if(departureMin < arrivalMin){
-//                return response;
-//            }else {
-//                response.code = 8;
-//                return response;
-//            }
-//        }else {
-//            // Example : departure at 11 arrival at 10
-//            response.code = 8;
-//            return response;
-//        }
-//    }
+    public Response DepartureAmbiguity(int departureHour1,
+                                       int departureMin1,
+                                       int departureHour2,
+                                       int departureMin2,
+                                       int arrivalHour,
+                                       int arrivalMin){
+        Response response = new Response();
+        response.code = 7;
+        Time responseTime = new Time(3);
+        responseTime.hour = -1;
+        responseTime.minute = -1;
+        // Departure Time 2
+        if(departureHour2 < arrivalHour){
+            responseTime.hour = departureHour2;
+            responseTime.minute = departureMin2;
+        } else if (departureHour2 == arrivalHour) {
+            if(departureMin2 < arrivalMin){
+                responseTime.hour = departureHour2;
+                responseTime.minute = departureMin2;
+            }
+        }
+
+        // Departure Time 1
+        if(responseTime.hour == -1){
+            if(departureHour1 < arrivalHour){
+                responseTime.hour = departureHour1;
+                responseTime.minute = departureMin1;
+            } else if (departureHour1 == arrivalHour) {
+                if(departureMin1 < arrivalMin){
+                    responseTime.hour = departureHour1;
+                    responseTime.minute = departureMin1;
+                }
+            }
+        }
+        if(responseTime.hour == -1){
+            response.code = 8;
+        }
+        response.time = responseTime;
+        return response;
+    }
 
 
     /**
