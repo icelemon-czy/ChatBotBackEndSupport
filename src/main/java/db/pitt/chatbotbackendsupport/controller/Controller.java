@@ -37,21 +37,25 @@ public class Controller {
     }
 
 
-    @GetMapping("ambiguity/{arrivalHour}/{arrivalMin}/{departureHour}/{departureMin}")
-    public Response DepartureAmbiguity(@PathVariable("departureHour") int departureHour,
-                                       @PathVariable("departureMin") int departureMin,
-                                       @PathVariable("arrivalHour") int arrivalHour,
-                                       @PathVariable("arrivalMin") int arrivalMin){
-//        log.info("Resolve Departure Ambiguity "+"Arrival Time "+arrivalHour+":" +arrivalMin+
-//                " Departure Time(Ambiguity) "+departureHour+":"+departureMin);
-//        Response response = extractTimeService.DepartureAmbiguity(departureHour, departureMin, arrivalHour, arrivalMin);
-//        if(response.code == 7){
-//            log.info("DA Ambiguity Resolved ");
-//        }else {
-//            log.info("DA Ambiguity doesn't Resolved ");
-//        }
-//        return response;
-        return null;
+    /**
+     *  And departure 1 <（earlier) departure 2.
+     */
+    @GetMapping("ambiguity/{arrivalHour}/{arrivalMin}/{departureHour1}/{departureMin1}/{departureHour2}/{departureMin2}")
+    public Response DepartureAmbiguity(          @PathVariable("arrivalHour") int arrivalHour,
+                                                 @PathVariable("arrivalMin") int arrivalMin,
+                                                 @PathVariable("departureHour1") int departureHour1,
+                                                 @PathVariable("departureMin1") int departureMin1,
+                                                 @PathVariable("departureHour2")int departureHour2,
+                                                 @PathVariable("departureMin2") int departureMin2){
+        log.info("Resolve Departure Ambiguity "+"Arrival Time "+arrivalHour+":" +arrivalMin+
+                " Departure Time(Ambiguity) "+departureHour1+":"+departureMin1+" , "+departureHour2+":"+departureMin2);
+        Response response = extractTimeService.DepartureAmbiguity(departureHour1, departureMin1,departureHour2, departureMin2, arrivalHour, arrivalMin);
+        if(response.code == 7){
+            log.info("DA Ambiguity Resolved ");
+        }else {
+            log.info("DA Ambiguity doesn't Resolved ");
+        }
+        return response;
     }
 
     @GetMapping("/yesmodel/{input}")

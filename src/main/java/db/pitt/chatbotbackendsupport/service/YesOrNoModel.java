@@ -18,11 +18,11 @@ public class YesOrNoModel {
     public String RequestYesOrNo(String input) {
         URL url = null;
         try {
-            url = new URL("https://intentionclassificationeastus.cognitiveservices.azure.com/language/:analyze-conversations?api-version=2022-10-01-preview");
+            url = new URL("https://capriointentionclassification.cognitiveservices.azure.com/language/:analyze-conversations?api-version=2022-10-01-preview");
             HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
             httpConn.setRequestMethod("POST");
 
-            httpConn.setRequestProperty("Ocp-Apim-Subscription-Key", "31114ba43c99489491b14ff139529aa6");
+            httpConn.setRequestProperty("Ocp-Apim-Subscription-Key", "1e8c691965694b16b2b109f7f1973fa2");
             httpConn.setRequestProperty("Apim-Request-Id", "4ffcac1c-b2fc-48ba-bd6d-b69d9942995a");
             httpConn.setRequestProperty("Content-Type", "application/json");
 

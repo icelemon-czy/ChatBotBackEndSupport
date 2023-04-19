@@ -5,12 +5,9 @@ import db.pitt.chatbotbackendsupport.entity.Time;
 import db.pitt.chatbotbackendsupport.util.Util;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.PathVariable;
 
 import java.util.*;
 
-import static db.pitt.chatbotbackendsupport.constant.Constant.linkWordToInt;
-import static db.pitt.chatbotbackendsupport.constant.Constant.wordToInt;
 
 @Slf4j
 @Service
