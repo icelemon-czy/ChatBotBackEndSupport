@@ -366,6 +366,18 @@ public class Util {
     }
 
     /**
+     * Get Current Time
+     * Return the format :yyyy-MM-dd HH:mm
+     * Example Return String : "2023-04-12 13:54"
+     */
+    public static String getNowYYMMDDHHMM(){
+        Date date = new Date();
+        // SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy HH:mm");
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+        return formatter.format(date);
+    }
+
+    /**
      * Based on AM or PM Flag or Intention
      * transform hour from 12 clock system to 24 clock system
      * For example 1pm -> 13

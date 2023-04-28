@@ -17,7 +17,7 @@ public class Response{
     @Override
     public String toString() {
         if(code == 0){
-            return "Success: " + time;
+            return "No Ambiguity: " + time;
         }
         if(code == 1){
             return "Ambiguity: "+ time;

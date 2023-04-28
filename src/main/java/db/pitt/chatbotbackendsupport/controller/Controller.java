@@ -2,24 +2,26 @@ package db.pitt.chatbotbackendsupport.controller;
 
 import db.pitt.chatbotbackendsupport.entity.Response;
 import db.pitt.chatbotbackendsupport.service.ExtractTime;
+import db.pitt.chatbotbackendsupport.service.SUTime;
 import db.pitt.chatbotbackendsupport.service.YesOrNoModel;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
 @RequestMapping("/pitt/db/support")
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class Controller {
     private final ExtractTime extractTimeService;
 
     private final YesOrNoModel yesOrNoModel;
 
-    public Controller(ExtractTime extractTimeService, YesOrNoModel yesOrNoModel) {
+    private final SUTime suTimeService;
+
+    public Controller(ExtractTime extractTimeService, YesOrNoModel yesOrNoModel, SUTime suTime) {
         this.extractTimeService = extractTimeService;
         this.yesOrNoModel = yesOrNoModel;
+        this.suTimeService = suTime;
     }
 
     @GetMapping("/re/{input}")
@@ -34,6 +36,11 @@ public class Controller {
             log.info("RE Fail");
         }
         return response;
+    }
+
+    @GetMapping("/sut/{input}")
+    public String SUT(@PathVariable("input") String input){
+        return suTimeService.SUTimeExtract(input);
     }
 
 
